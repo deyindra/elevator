@@ -1,0 +1,10 @@
+**/target
+**/*.log*
+**/.classpath
+**/.project
+**/.eclipse
+**/.settings
+.idea/
+*.iml
+*.iws
+.DS_Store
