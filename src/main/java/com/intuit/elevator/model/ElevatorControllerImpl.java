@@ -1,67 +1,241 @@
 package com.intuit.elevator.model;
 
 import com.intuit.elevator.constant.ElevatorConstant;
+import com.intuit.elevator.exception.ElevatorMovingException;
 import com.intuit.elevator.state.State;
 import com.intuit.elevator.state.elevator.ElevatorState;
 import com.intuit.elevator.util.ConcurrentList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * @author indranil dey
+ * Controller class to manage all elevators
+ * @see com.intuit.elevator.model.ElevatorImpl
+ * @see com.intuit.elevator.model.Elevator
+ * @see com.intuit.elevator.model.ElevatorController
+ */
 public class ElevatorControllerImpl implements ElevatorController,ElevatorConstant{
+    // total number elevator
     private ConcurrentList<Elevator> elevatorConcurrentList = new ConcurrentList<>();
+    // total number of floor assigned to elevator
     private ConcurrentList<Floor> floorConcurrentList = new ConcurrentList<>();
-
+    private final int totalFloor;
     private static final Logger LOGGER = LoggerFactory.getLogger(ElevatorControllerImpl.class);
 
 
-    public ElevatorControllerImpl(final int totalElevator, final int totalFloor) {
-        if(totalElevator>=0 && totalElevator<=TOTAL_ELEVATOR){
+    public ElevatorControllerImpl(final int totalFloor, final int totalElevator) {
+        if(totalElevator>=1){
             for(int i=0;i<totalElevator;i++){
-                Elevator e = new ElevatorImpl(this,i+1, totalFloor);
+                Elevator e = new ElevatorImpl(this,i+1, totalFloor, totalElevator);
                 elevatorConcurrentList.add(e);
             }
         }else{
             throw new IllegalArgumentException("Invalid Total number of elevator "+totalElevator);
         }
 
-        if(totalFloor>=0 && totalFloor<=TOTAL_FLOOR){
+        if(totalFloor>1){
             for(int i=0;i<totalFloor;i++){
-                Floor f = new FloorImpl(this,i+1);
+                Floor f = new FloorImpl(this,i+1, totalFloor);
                 floorConcurrentList.add(f);
             }
         }else{
             throw new IllegalArgumentException("Invalid Total number of floor "+totalFloor);
         }
-
+        this.totalFloor = totalFloor;
     }
 
+    /**
+     *
+     * @param floorNumber floor number
+     * @param person person who request the elevator
+     */
+    @SuppressWarnings("AccessStaticViaInstance")
     @Override
     public void commandElevatorToUpImmediately(int floorNumber, Person person) {
-        //TODO
+        Elevator e = null;
+        int counter = 0;
+        while (e == null && person.getKeepRunning()){  // need this to stop processes stuck in this loop when program stops
+            LOGGER.info("" + ++counter + " tries to move up elevator to floor " + floorNumber);
+            e = getSameFloorElevator(floorNumber);
+            if(e != null){
+                LOGGER.info("Setting up destination for elevator " + e.getElevatorNumber() + " same floor " + floorNumber);
+                try{
+                    e.moveToDestination(floorNumber);
+                }catch(ElevatorMovingException ex){
+                    LOGGER.error(ex.getMessage());
+                    LOGGER.info("Moving Exception up: floor " + floorNumber + " on elevator " + e.getElevatorState());
+                    e = null;
+                    continue;
+                }
+            }else{
+                if(floorNumber > 1){ // there won't be any below floor 1
+                    LOGGER.info("looking for one moving up from below to floor " + floorNumber);
+                    e = getElevator(floorNumber, ElevatorState.ElevatorMovingDirection.MOVING_UP);
+                }
+                if(e != null){
+                    LOGGER.info("Setting destination for elevator " + e.getElevatorNumber() + " from  below floor " + floorNumber);
+                    try{
+                        e.moveToDestination(floorNumber);
+                    }catch(ElevatorMovingException ex){
+                        LOGGER.error(ex.getMessage());
+                        LOGGER.info("Moving Exception up: floor " + floorNumber + " on elevator " + e.getElevatorState());
+                        e = null;
+                        continue;
+                    }
+                }else{
+                    LOGGER.info("Looking for closest stopped elevator for up floor " + floorNumber);
+                    e = getElevator(floorNumber, ElevatorState.ElevatorMovingDirection.NO_DIRECTION);
+                    if (e != null) {
+                        LOGGER.info("Setting destination for stopped elevator " + e.getElevatorNumber() + " for up floor " + floorNumber);
+                        try{
+                            e.moveToDestination(floorNumber);
+                        }catch(ElevatorMovingException ex){
+                            LOGGER.error(ex.getMessage());
+                            LOGGER.info("Moving Exception up: floor " + floorNumber + " on elevator " + e.getElevatorState());
+                            e = null;
+                            continue;
+                        }
+                    }else{
+                        LOGGER.info("Looking for elevator coming down " + floorNumber);
+                        e = getElevator(floorNumber, ElevatorState.ElevatorMovingDirection.MOVING_DOWN);
+                        if(e != null){
+                            LOGGER.info("Setting destination for moving down elevator " + e.getElevatorNumber() + " for floor " + floorNumber);
+                            try{
+                                e.moveToDestination(floorNumber);
+                            }catch(ElevatorMovingException ex){
+                                LOGGER.error(ex.getMessage());
+                                LOGGER.info("Moving Exception up: floor " + floorNumber + " on elevator " + e.getElevatorState());
+                                e = null;
+                                continue;
+                            }
+                        }// end null any
+                    }// end null nearest stopped
+                } // end null nearest moving up
+            }// end null same floor
+            if(e == null){
+                try{
+                    Thread.currentThread().sleep(1000); //wait a second and try again
+                }catch(InterruptedException ix){
+                    //intentionally left empty
+                }
+            }//end if null for sleep
+        }// end while
     }
 
+    /**
+     *
+     * @param floorNumber floor to go to
+     * @param person person who request the elevator
+     */
+    @SuppressWarnings("AccessStaticViaInstance")
     @Override
     public void commandElevatorDownToDownImmediately(int floorNumber, Person person) {
-        //TODO
-
+        Elevator e = null;
+        int counter = 0;
+        while ( e == null && person.getKeepRunning()){  // need this to stop processes stuck in this loop when program stops
+            LOGGER.info("" + ++counter + " tries to move down elevator to floor " + floorNumber);
+            e = getSameFloorElevator(floorNumber);
+            if(e != null){
+                LOGGER.info("Setting down destination for elevator " + e.getElevatorNumber() + " same floor " + floorNumber);
+                try{
+                    e.moveToDestination(floorNumber);
+                }catch(ElevatorMovingException ex){
+                    LOGGER.error(ex.getMessage());
+                    LOGGER.info("Moving Exception down: floor " + floorNumber + " on elevator " + e.getElevatorState());
+                    e = null;
+                    continue;
+                }
+            }else{
+                if(floorNumber != totalFloor){  // there won't be any above the top floor
+                    LOGGER.info("looking for one moving down from above to floor " + floorNumber);
+                    e = getElevator(floorNumber, ElevatorState.ElevatorMovingDirection.MOVING_DOWN);
+                }
+                if(e != null){
+                    LOGGER.info("Setting destination for elevator " + e.getElevatorNumber() + "from  above floor " + floorNumber);
+                    try{
+                        e.moveToDestination(floorNumber);
+                    }catch(ElevatorMovingException ex){
+                        LOGGER.error(ex.getMessage());
+                        LOGGER.error("Moving Exception down: floor " + floorNumber + " on elevator " + e.getElevatorState());
+                        e = null;
+                        continue;
+                    }
+                }else{
+                    LOGGER.info("Looking for closest stopped elevator for down floor " + floorNumber);
+                    e = getElevator(floorNumber, ElevatorState.ElevatorMovingDirection.NO_DIRECTION);
+                    if(e != null){
+                        LOGGER.info("Setting destination for stopped elevator " + e.getElevatorNumber() + " for down floor " + floorNumber);
+                        try{
+                            e.moveToDestination(floorNumber);
+                        }catch(ElevatorMovingException ex){
+                            LOGGER.error(ex.getMessage());
+                            LOGGER.info("Moving Exception down3: floor " + floorNumber + " on elevator " + e.getElevatorState());
+                            e = null;
+                            continue;
+                        }
+                    }else{
+                        LOGGER.info("Looking for elevator coming up " + floorNumber);
+                        e = getElevator(floorNumber, ElevatorState.ElevatorMovingDirection.MOVING_UP);
+                        if(e != null){
+                            LOGGER.info("Setting destination for moving up elevator " + e.getElevatorNumber() + " for floor " + floorNumber);
+                            try{
+                                e.moveToDestination(floorNumber);
+                            }catch(ElevatorMovingException ex){
+                                LOGGER.error(ex.getMessage());
+                                LOGGER.info("Moving Exception down: floor " + floorNumber + " on elevator " + e.getElevatorState());
+                                e = null;
+                                continue;
+                            }
+                        }// end null any
+                    }// end null stopped
+                }// end null moving down
+            } //end null same floor
+            if(e == null){
+                try{
+                    Thread.currentThread().sleep(1000); //wait a second and try again
+                }catch(InterruptedException ix){
+                    //intentionally left empty
+                }
+            } //end if null for sleep
+        }// end while
     }
 
+    /**
+     * start all elevator thread
+     */
     @Override
     public void startElevators() {
-        //TODO
-
+        for(int i = 0; i < elevatorConcurrentList.size(); i++){
+            elevatorConcurrentList.get(i).start();
+        }
     }
 
+    /**
+     *
+     * @param elevatorNumber elevator id
+     * @return return the state of the elevator
+     */
     @Override
     public State getElevatorState(int elevatorNumber) {
         return elevatorConcurrentList.get(elevatorNumber-1).getElevatorState();
     }
 
+    /**
+     *
+     * @param floorNumber floor number
+     * @return int number of person want to gp up
+     */
     @Override
     public int getNumberWaitingUp(int floorNumber) {
         return getFloor(floorNumber).getNumberWaitingUp();
     }
 
+    /**
+     *
+     * @param floorNumber floor number
+     * @return int number of person want to gp down
+     */
     @Override
     public int getNumberWaitingDown(int floorNumber) {
         return getFloor(floorNumber).getNumberWaitingDown();
@@ -72,10 +246,14 @@ public class ElevatorControllerImpl implements ElevatorController,ElevatorConsta
         return floorConcurrentList.get(floorNumber - 1);
     }
 
+    /**
+     * stop all elevator thread
+     */
     @Override
     public void stopElevators() {
-        //TODO
-
+        for(int i = 0; i < elevatorConcurrentList.size(); i++){
+            elevatorConcurrentList.get(i).setStopRunning();
+        }
     }
 
     /**

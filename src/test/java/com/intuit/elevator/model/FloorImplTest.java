@@ -3,6 +3,7 @@ package com.intuit.elevator.model;
 import com.intuit.elevator.AbstractPropertyLoader;
 import com.intuit.elevator.rule.ExceptionLoggingRule;
 import com.intuit.elevator.state.State;
+import com.intuit.elevator.state.person.PersonState;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -17,27 +18,27 @@ public class FloorImplTest extends AbstractPropertyLoader {
     @Test
     public void invalidFloorNumberTest1(){
         expectedException.expect(IllegalArgumentException.class);
-        new FloorImpl(new DummyElevatorController(),10000);
+        new FloorImpl(new DummyElevatorController(),10000,5);
     }
 
     @Test
     public void invalidFloorNumberTest2(){
         expectedException.expect(IllegalArgumentException.class);
-        new FloorImpl(new DummyElevatorController(),-1);
+        new FloorImpl(new DummyElevatorController(),-1,5);
     }
 
     @Test
     public void invalidControllerTest(){
         expectedException.expect(IllegalArgumentException.class);
-        new FloorImpl(null,2);
+        new FloorImpl(null,2,10);
     }
 
     @Test
     public void validFloorTest(){
         DummyElevatorController controller = new DummyElevatorController();
-        Floor f = new FloorImpl(controller,10);
-        Elevator e1 = new ElevatorImpl(controller,3,10);
-        Elevator e2 = new ElevatorImpl(controller,2,10);
+        Floor f = new FloorImpl(controller,10,20);
+        Elevator e1 = new ElevatorImpl(controller,3,10,20);
+        Elevator e2 = new ElevatorImpl(controller,2,10,20);
         Assert.assertEquals(false, f.isCommandDownImmediately());
         Assert.assertEquals(false, f.isCommandUpImmediately());
         Person dummyPerson1 = new DummyPerson(1);
@@ -84,6 +85,8 @@ public class FloorImplTest extends AbstractPropertyLoader {
             return personId;
         }
 
+
+
         @Override
         public void elevatorArrived(Elevator elevator) {
 
@@ -91,6 +94,61 @@ public class FloorImplTest extends AbstractPropertyLoader {
 
         @Override
         public void attention() {
+
+        }
+
+        @Override
+        public boolean getKeepRunning() {
+            return false;
+        }
+
+        @Override
+        public boolean isWantToEnter() {
+            return false;
+        }
+
+        @Override
+        public void setWantToEnter(boolean wantToEnter) {
+
+        }
+
+        @Override
+        public boolean isWantToLeave() {
+            return false;
+        }
+
+        @Override
+        public void setWantToLeave(boolean wantToLeave) {
+
+        }
+
+        @Override
+        public boolean isWantToTakeStair() {
+            return false;
+        }
+
+        @Override
+        public void setWantToTakeStair(boolean wantToTakeStair) {
+
+        }
+
+        @Override
+        public void setStopRunning() {
+
+        }
+
+        @Override
+        public PersonState getState() {
+            return null;
+        }
+
+        @Override
+        public void start() {
+
+        }
+
+        @Override
+        public void setDestination(int destination) {
 
         }
 

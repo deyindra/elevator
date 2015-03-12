@@ -23,10 +23,13 @@ public class Building implements ElevatorConstant{
     private static volatile Building BUILDING = null;
 
     private Building(final int floors, final int elevators) {
-        elevatorController = new ElevatorControllerImpl(floors, elevators);
-        elevatorController.startElevators();
-        this.totalElevator= elevators;
-        this.totalFloor=floors;
+        if(floors>1) {
+            elevatorController = new ElevatorControllerImpl(floors, elevators);
+            this.totalElevator = elevators;
+            this.totalFloor = floors;
+        }else{
+            throw new IllegalArgumentException("Building should have more than 1 floor");
+        }
     }
 
     public static Building getInstance(final int floors, final int elevators){
@@ -84,6 +87,13 @@ public class Building implements ElevatorConstant{
      */
     public Floor enterBuilding() {
         return getFloor(1);
+    }
+
+    /**
+     * command to start all elevators
+     */
+    public void startElevators(){
+        elevatorController.startElevators();
     }
 
     /**

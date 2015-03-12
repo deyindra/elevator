@@ -22,9 +22,9 @@ public class FloorImpl extends AbstractElevatorControllerHolder implements Floor
     private final ConcurrentList<Person> downWaiting = new ConcurrentList<>();
     private static final Logger LOGGER = LoggerFactory.getLogger(FloorImpl.class);
 
-    public FloorImpl(ElevatorController controller, int floorNumber) {
+    public FloorImpl(ElevatorController controller, int floorNumber, final int totalFloors) {
         super(controller);
-        if(floorNumber>=1 && floorNumber<=TOTAL_FLOOR) {
+        if(floorNumber>=1 && floorNumber<=totalFloors) {
             this.floorNumber = floorNumber;
         }else {
             throw new IllegalArgumentException("Invalid Floor number " + floorNumber);

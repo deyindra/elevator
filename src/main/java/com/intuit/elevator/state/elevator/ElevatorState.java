@@ -108,7 +108,7 @@ public class ElevatorState extends State{
             if (index >= 0 && index < destination.length) {
                 return destination[index];
             } else {
-                throw new IllegalArgumentException("Invalid Index..." + index);
+                throw new IllegalArgumentException("Invalid Index..." + index+" total destination length "+destination.length);
             }
         }finally {
             readLock.unlock();
@@ -175,8 +175,8 @@ public class ElevatorState extends State{
     @Override
     public String toString() {
         StringBuilder builder = new StringBuilder("");
-        builder.append("Elevator Number ").append(id);
-        builder.append("Current Floor ").append(currentFloorNumber);
+        builder.append(" Elevator Number ").append(id);
+        builder.append(" Current Floor ").append(currentFloorNumber);
         if(destination!=null && destination.length>0) {
            StringBuilder destList = new StringBuilder("");
            String separator="";
@@ -187,12 +187,17 @@ public class ElevatorState extends State{
                    separator=",";
                }
            }
-           builder.append("Destination List ").append(destList.toString());
+           String strDestList =  destList.toString();
+           if(!strDestList.isEmpty()) {
+               builder.append(" Destination List ").append(destList.toString());
+           }else{
+               builder.append(" Destination List ").append("NONE");
+           }
         }
-        builder.append("Rider ").append(riders);
-        builder.append("Moving direction ").append(direction);
-        builder.append("Moving state ").append(elevatorMovingState);
-        builder.append("Elevator's Door status ").append(doorState);
+        builder.append(" Rider ").append(riders);
+        builder.append(" Moving direction ").append(direction);
+        builder.append(" Moving state ").append(elevatorMovingState);
+        builder.append(" Elevator's Door status ").append(doorState);
         return builder.toString();
     }
 }

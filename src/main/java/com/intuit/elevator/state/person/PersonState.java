@@ -150,16 +150,16 @@ public class PersonState extends State{
         StringBuilder builder = new StringBuilder("");
         builder.append("person id ").append(id);
         if(activity!=null){
-            builder.append("activity ").append(activity);
+            builder.append(" activity ").append(activity);
         }
         if(elevatorNumber!=0){
-            builder.append("elevator ").append(elevatorNumber);
+            builder.append(" elevator ").append(elevatorNumber);
         }
         if(currentPersonLocation!=null){
-            builder.append("current location ").append(currentPersonLocation);
+            builder.append(" current location ").append(currentPersonLocation);
         }
         if(destinationPersonLocation!=null){
-            builder.append("destination location ").append(destinationPersonLocation);
+            builder.append(" destination location ").append(destinationPersonLocation);
         }
         return builder.toString();
     }
