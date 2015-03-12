@@ -12,10 +12,10 @@ import java.util.Collection;
 
 @RunWith(Parameterized.class)
 public class ElevatorConstantTest extends AbstractPropertyLoader{
-    private long inputValue;
-    private long expectedValue;
+    private int inputValue;
+    private int expectedValue;
 
-    public ElevatorConstantTest(long inputValue, long expectedValue) {
+    public ElevatorConstantTest(int inputValue, int expectedValue) {
         this.inputValue = inputValue;
         this.expectedValue = expectedValue;
     }
@@ -33,7 +33,8 @@ public class ElevatorConstantTest extends AbstractPropertyLoader{
                 {ElevatorConstant.ELEVATOR_INACTIVE_TIME, 2000},
                 {ElevatorConstant.ELEVATOR_MAX_OCCUPANCY, 30},
                 {ElevatorConstant.PERSON_WAITING_TIME, 2000},
-                {ElevatorConstant.PERSON_WORKING_TIME, 4000}
+                {ElevatorConstant.PERSON_WORKING_TIME, 4000},
+                {ElevatorConstant.DOOR_TOGGLE_STATUS, 1000}
 
         });
     }

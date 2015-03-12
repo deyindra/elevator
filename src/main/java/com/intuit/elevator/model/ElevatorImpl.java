@@ -1,0 +1,376 @@
+package com.intuit.elevator.model;
+
+import com.intuit.elevator.constant.ElevatorConstant;
+import com.intuit.elevator.exception.DoorClosedException;
+import com.intuit.elevator.exception.ElevatorFullException;
+import com.intuit.elevator.exception.ElevatorMovingException;
+import com.intuit.elevator.state.elevator.ElevatorState;
+import com.intuit.elevator.util.ConcurrentList;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * @author indranil dey
+ * Concrete implementation of {@link com.intuit.elevator.model.Elevator} interafce. This is also extends
+ * {@link com.intuit.elevator.model.ElevatorController}.
+ * @see com.intuit.elevator.model.AbstractElevatorControllerHolder
+ * @see com.intuit.elevator.model.Elevator
+ * @see com.intuit.elevator.model.ElevatorController
+ * @see com.intuit.elevator.constant.ElevatorConstant
+ * @see com.intuit.elevator.state.elevator.ElevatorState
+ */
+public class ElevatorImpl extends AbstractElevatorControllerHolder implements Elevator, ElevatorConstant, Runnable {
+    // Elevator ID which will be always greater than 0
+    private int elevatorID;
+    // Elevator state
+    private volatile ElevatorState elevatorState;
+    //Current Elevator Floor Number
+    private volatile int currentFloorNumber;
+    // Flag to keep track of toggle door's status
+    private boolean requestDoorOpen;
+    // Passenger list riding the elevator
+    private final ConcurrentList<Person> rider = new ConcurrentList<>();
+    //Current Elevator thread
+    private Thread activeElevator;
+    // Flag to run the elevator thread
+    private volatile boolean keepRunning;
+    //total number of floor in the building
+    private final int totalFloor;
+    private static final Logger LOGGER = LoggerFactory.getLogger(ElevatorImpl.class);
+
+    /**
+     *
+     * @param controller ElevatorController object
+     * @param elevatorID elevator id
+     * @param totalFloors total number of floor
+     * @throws  java.lang.IllegalArgumentException in case of elevatorID is less or equal to 0 or greater than total totalFloor
+     *
+     */
+    public ElevatorImpl(ElevatorController controller, int elevatorID, final int totalFloors) {
+        super(controller);
+        if(elevatorID>=1 && elevatorID<=TOTAL_ELEVATOR) {
+            this.elevatorID = elevatorID;
+
+        }else{
+            throw new IllegalArgumentException("Invalid Elevator Number "+elevatorID);
+        }
+        elevatorState = new ElevatorState(elevatorID);
+        //Initially elevator moving state is STOPPED
+        elevatorState.setElevatorMovingState(ElevatorState.ElevatorMovingState.STOPPED);
+        //Initially elevator direction is NO_DIRECTION
+        elevatorState.setDirection(ElevatorState.ElevatorMovingDirection.NO_DIRECTION);
+        //Initially elevator door is DOOR_CLOSED
+        elevatorState.setDoorState(ElevatorState.ElevatorDoorState.DOOR_CLOSED);
+        //Assumption all elevator will start with floor number 1
+        currentFloorNumber=1;
+        elevatorState.setCurrentFloorNumber(currentFloorNumber);
+        //Number of rider initially assigned to elevator initially will be 0
+        elevatorState.setRiders(0);
+        // Assign boolean array for desitination list
+        boolean[] desitination = new boolean[totalFloors];
+        for (int i = 0; i < desitination.length; i++) {
+            desitination[i] = false;
+        }
+        elevatorState.setDestination(desitination);
+        totalFloor = totalFloors;
+    }
+
+
+
+    @Override
+    public void setStopRunning() {
+        keepRunning = false;
+    }
+
+    @Override
+    public synchronized void setDestination(int floorNumber) {
+        if (rider.isEmpty() && elevatorState.getElevatorMovingState()
+                == ElevatorState.ElevatorMovingState.STOPPED) {
+            elevatorState.setDestinationIndex(floorNumber-1,true);
+            activeElevator.interrupt();
+        } else {
+            elevatorState.setDestinationIndex(floorNumber-1,true);
+        }
+    }
+
+
+    @Override
+    public synchronized ElevatorState getElevatorState() {
+        elevatorState.setRiders(rider.size());
+        elevatorState.setCurrentFloorNumber(currentFloorNumber);
+        return elevatorState;
+    }
+
+    @Override
+    public synchronized void moveToDestination(int floorNumber) throws ElevatorMovingException {
+        if (getCurrentFloorNumber() != floorNumber || rider.isEmpty()) {
+            elevatorState.setDestinationIndex(floorNumber-1,true);
+            activeElevator.interrupt();
+        } else {
+            throw new ElevatorMovingException(elevatorID, "either current floor and the destination floor are same or elevator has passengers");
+        }
+    }
+
+
+    @Override
+    public synchronized void requestOpenDoor() throws ElevatorMovingException {
+        if (elevatorState.getElevatorMovingState() == ElevatorState.ElevatorMovingState.STOPPED)
+            requestDoorOpen = true;
+        else
+            throw new ElevatorMovingException(elevatorID, "Try to open door when elevator is in motion");
+    }
+
+    @Override
+    public int getCurrentFloorNumber() {
+        return currentFloorNumber;
+    }
+
+    @Override
+    public int getElevatorNumber() {
+        return elevatorID;
+    }
+
+
+    @Override
+    public void start() {
+        LOGGER.info("Elevator ID "+elevatorID);
+        keepRunning = true;
+        if (activeElevator == null) {
+            activeElevator = new Thread(this);
+            //activeElevator.setDaemon(true);
+            activeElevator.setPriority(Thread.NORM_PRIORITY - 1);
+            activeElevator.start();
+        }
+    }
+
+    @Override
+    public void run() {
+        LOGGER.info("Starting elevator " + elevatorID);
+        while (keepRunning) {
+            switch (elevatorState.getElevatorMovingState()) {
+                case STOPPED:
+                    LOGGER.info("Elevator " + elevatorID + " is stopped");
+                    if (rider.isEmpty() && !isDestination()) {
+                        elevatorState.setDirection(ElevatorState.ElevatorMovingDirection.NO_DIRECTION);
+                        LOGGER.info("Elevator " + elevatorID + " is empty and has no destination");
+                        action(ELEVATOR_INACTIVE_TIME);
+                    } else if (isArrived()) {
+                        LOGGER.info("Elevator " + elevatorID + " has arrived on " + currentFloorNumber);
+                        openDoor();
+                        closingDoor();
+                        removeDestination();
+                    } else {
+                        LOGGER.info("Elevator " + elevatorID + " is continuing to travel");
+                        travel();
+                    }
+                    break;
+                case MOVING:
+                    if (isArrived()) {
+                        stopElevator();
+                    } else {
+                        travel();
+                    }
+                    break;
+            }
+           LOGGER.info(elevatorState.toString());
+        }
+    }
+
+
+
+
+    public void leaveElevator(final Person person) throws DoorClosedException {
+        if (elevatorState.getDoorState() == ElevatorState.ElevatorDoorState.DOOR_OPEN)
+            rider.remove(person);
+        else {
+            LOGGER.info("Elevator " + elevatorID + " door is closed can not leave.");
+            throw new DoorClosedException(elevatorID);
+        }
+    }
+
+
+
+    @Override
+    public void enterElevator(final Person person) throws ElevatorFullException, DoorClosedException {
+        if (elevatorState.getDoorState() == ElevatorState.ElevatorDoorState.DOOR_OPEN) {
+            if (rider.size() < ELEVATOR_MAX_OCCUPANCY) {
+                rider.add(person);
+            } else {
+                LOGGER.info("Elevator " + elevatorID + " is full");
+                throw new ElevatorFullException(elevatorID);
+            }
+        } else {
+            LOGGER.info("Elevator " + elevatorID + " door is closed can not enter.");
+            throw new DoorClosedException(elevatorID);
+        }
+    }
+
+
+    @SuppressWarnings("AccessStaticViaInstance")
+    private void action(long time) {
+        try {
+            activeElevator.sleep(time);
+        } catch (InterruptedException ix) {
+           // DO NOTHING
+        }
+    }
+
+
+    private synchronized boolean isArrived() {
+        boolean returnValue = false;
+        if (elevatorState.getDestinationIndex(currentFloorNumber - 1)) {
+            returnValue = true;
+            elevatorState.setElevatorMovingState(ElevatorState.ElevatorMovingState.STOPPED);
+        }
+        return returnValue;
+    }
+
+    private void moveUp() {
+        if (isDestinationAbove()) {
+            if (currentFloorNumber != totalFloor) {
+                LOGGER.info("Elevator is moving up");
+                action(FLOOR_TRAVEL_TIME);
+                ++currentFloorNumber;
+            }
+        } else if (isDestinationBelow()) {
+           LOGGER.info("Elevator moving up is changing direction");
+            elevatorState.setDirection(ElevatorState.ElevatorMovingDirection.MOVING_DOWN); //  someone missed floor change direction
+        } else {
+            LOGGER.info("move up is stopping");
+            stopElevator(); // only destination is this floor
+        }
+    }
+
+    private void moveDown() {
+        if (isDestinationBelow()) {
+            if (currentFloorNumber != 1) {
+                LOGGER.info("Elevator is move down");
+                action(FLOOR_TRAVEL_TIME);
+                --currentFloorNumber;
+            }
+        } else if (isDestinationAbove()) {
+            LOGGER.info("Elevator move down is changing direction");
+            elevatorState.setDirection(ElevatorState.ElevatorMovingDirection.MOVING_UP);   // someone missed floor change direction
+        } else {
+            LOGGER.info("move down is stopping");
+            stopElevator(); // only destination is this floor
+        }
+    }
+
+    private void openDoor() {
+        if (elevatorState.getDoorState() == ElevatorState.ElevatorDoorState.DOOR_CLOSED &&
+                elevatorState.getElevatorMovingState() == ElevatorState.ElevatorMovingState.STOPPED) {
+            elevatorState.setDoorState(ElevatorState.ElevatorDoorState.DOOR_OPEN);
+            notifyRiders();
+            notifyController();
+            action(FLOOR_WAIT_TIME);
+        }
+    }
+
+    private void closingDoor() {
+        do {
+            resetDoorRequest();
+            notifyRiders();
+            notifyController();
+            action(DOOR_TOGGLE_STATUS);//give people a change to request door open
+        } while (isRequestDoorOpen());
+        elevatorState.setDoorState(ElevatorState.ElevatorDoorState.DOOR_CLOSED);
+    }
+
+
+    private synchronized void resetDoorRequest() {
+        requestDoorOpen = false;
+    }
+
+    private synchronized boolean isRequestDoorOpen() {
+        return requestDoorOpen;
+    }
+
+    private void notifyRiders() {
+        synchronized (rider) {
+            for (int i = 0; i < rider.size(); i++) {
+                rider.get(i).attention();
+            }
+        }
+
+    }
+
+    private void notifyController() {
+        controller.elevatorArrived(currentFloorNumber, this);
+    }
+
+    private synchronized void travel() {
+        if (isDestination()) {
+            LOGGER.info("Elevator has a destination");
+            elevatorState.setElevatorMovingState(ElevatorState.ElevatorMovingState.MOVING);
+            if (elevatorState.getDirection() == ElevatorState.ElevatorMovingDirection.MOVING_UP) {
+                LOGGER.info("Elevator Moving up");
+                moveUp();
+            } else if (elevatorState.getDirection() == ElevatorState.ElevatorMovingDirection.MOVING_DOWN) {
+                LOGGER.info("Elevator Moving Down");
+                moveDown();
+            } else if (isDestinationAbove()) {
+                LOGGER.info("Setting direction up");
+                elevatorState.setDirection(ElevatorState.ElevatorMovingDirection.MOVING_UP);
+                moveUp();
+            } else if (isDestinationBelow()) {
+                LOGGER.info("Setting direction down");
+                elevatorState.setDirection(ElevatorState.ElevatorMovingDirection.MOVING_DOWN);
+                moveDown();
+            } else { //someone wants us where we are
+                LOGGER.info("someone wants on this floor " + currentFloorNumber);
+                stopElevator();
+            }
+        } else { // no destination don't move;
+            LOGGER.info("There is no destination");
+            elevatorState.setDirection(ElevatorState.ElevatorMovingDirection.NO_DIRECTION);
+            elevatorState.setElevatorMovingState(ElevatorState.ElevatorMovingState.STOPPED);
+            action(ELEVATOR_INACTIVE_TIME);
+        }
+    }
+
+
+
+    private synchronized void removeDestination() {
+        elevatorState.setDestinationIndex(currentFloorNumber - 1, false);
+    }
+
+
+    private void stopElevator() {
+        elevatorState.setElevatorMovingState(ElevatorState.ElevatorMovingState.STOPPED);
+    }
+
+    private  synchronized boolean isDestination() {
+        boolean returnValue = false;
+        for (int i = 0; i < totalFloor; i++) {
+            if (elevatorState.getDestinationIndex(i)) {
+                returnValue = true;
+                break;
+            }
+        }
+        return returnValue;
+    }
+
+
+    private  synchronized boolean isDestinationAbove() {
+        boolean returnValue = false;
+        for (int i = getCurrentFloorNumber(); i < totalFloor; i++) {
+            if (elevatorState.getDestinationIndex(i)) {
+                returnValue = true;
+                break;
+            }
+        }
+        return returnValue;
+    }
+
+    private  synchronized boolean isDestinationBelow() {
+        boolean returnValue = false;
+        for (int i = getCurrentFloorNumber() - 2; i >= 0; i--) {
+            if (elevatorState.getDestinationIndex(i)) {
+                returnValue = true;
+                break;
+            }
+        }
+        return returnValue;
+    }
+}

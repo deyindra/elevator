@@ -2,7 +2,6 @@ package com.intuit.elevator.state.elevator;
 
 
 import com.intuit.elevator.state.State;
-import com.intuit.elevator.util.AtomicBitSet;
 
 
 /**
@@ -14,12 +13,12 @@ import com.intuit.elevator.util.AtomicBitSet;
  * @see com.intuit.elevator.state.elevator.ElevatorState.ElevatorMovingState
  */
 public class ElevatorState extends State{
-    private ElevatorMovingDirection direction;
-    private ElevatorDoorState doorState;
-    private ElevatorMovingState elevatorMovingState;
-    private int currentFloorNumber;
-    private AtomicBitSet destination;
-    private int riders;
+    private volatile ElevatorMovingDirection direction;
+    private volatile ElevatorDoorState doorState;
+    private volatile ElevatorMovingState elevatorMovingState;
+    private volatile int currentFloorNumber;
+    private volatile boolean[] destination;
+    private volatile int riders;
 
     public ElevatorState(int id) {
         super(id);
@@ -27,51 +26,124 @@ public class ElevatorState extends State{
 
 
     public ElevatorMovingDirection getDirection() {
-        return direction;
+        readLock.lock();
+        try {
+            return direction;
+        }finally {
+            readLock.unlock();
+        }
+
     }
 
-    public synchronized void setDirection(ElevatorMovingDirection direction) {
+    public  void setDirection(ElevatorMovingDirection direction) {
+        writeLock.lock();
         this.direction = direction;
+        writeLock.unlock();
     }
 
     public  ElevatorDoorState getDoorState() {
-        return doorState;
+        readLock.lock();
+        try {
+            return doorState;
+        }finally {
+            readLock.unlock();
+        }
     }
 
-    public synchronized void setDoorState(ElevatorDoorState doorState) {
+    public  void setDoorState(ElevatorDoorState doorState) {
+        writeLock.lock();
         this.doorState = doorState;
+        writeLock.unlock();
     }
 
     public ElevatorMovingState getElevatorMovingState() {
-        return elevatorMovingState;
+        readLock.lock();
+        try {
+            return elevatorMovingState;
+        }finally {
+            readLock.unlock();
+        }
+
     }
 
-    public synchronized void setElevatorMovingState(ElevatorMovingState elevatorMovingState) {
+    public  void setElevatorMovingState(ElevatorMovingState elevatorMovingState) {
+        writeLock.lock();
         this.elevatorMovingState = elevatorMovingState;
+        writeLock.unlock();
     }
 
     public int getCurrentFloorNumber() {
-        return currentFloorNumber;
+        readLock.lock();
+        try {
+            return currentFloorNumber;
+        }finally {
+            readLock.unlock();
+        }
     }
 
-    public synchronized  void setCurrentFloorNumber(int currentFloorNumber) {
+    public   void setCurrentFloorNumber(int currentFloorNumber) {
+        writeLock.lock();
         this.currentFloorNumber = currentFloorNumber;
+        writeLock.unlock();
     }
 
-    public AtomicBitSet getDestination() {
-        return destination;
+    public boolean[] getDestination() {
+        readLock.lock();
+        try {
+            return destination;
+        }finally {
+            readLock.unlock();
+        }
     }
 
-    public synchronized void setDestination(AtomicBitSet destination) {
+    public  void setDestination(final boolean[] destination) {
+        writeLock.lock();
         this.destination = destination;
+        writeLock.unlock();
     }
+
+    public  boolean getDestinationIndex(int index){
+        readLock.lock();
+        try {
+            if (index >= 0 && index < destination.length) {
+                return destination[index];
+            } else {
+                throw new IllegalArgumentException("Invalid Index..." + index);
+            }
+        }finally {
+            readLock.unlock();
+        }
+    }
+
+    public  void setDestinationIndex(int index, boolean value){
+        writeLock.lock();
+        try {
+            if (index >= 0 && index < destination.length) {
+                destination[index] = value;
+            } else {
+                throw new IllegalArgumentException("Invalid Index..." + index);
+            }
+        }finally {
+            writeLock.unlock();
+        }
+    }
+
+
 
     public int getRiders() {
-        return riders;
+        readLock.lock();
+        try {
+            return riders;
+        }finally {
+            readLock.unlock();
+        }
+
     }
 
-    public synchronized void setRiders(int riders) {
+    public  void setRiders(int riders) {
+        writeLock.lock();
         this.riders = riders;
+        writeLock.unlock();
     }
 
     //enum to describe direction of elevator
@@ -103,11 +175,19 @@ public class ElevatorState extends State{
     @Override
     public String toString() {
         StringBuilder builder = new StringBuilder("");
-        String destinationList = destination.toString();
         builder.append("Elevator Number ").append(id);
         builder.append("Current Floor ").append(currentFloorNumber);
-        if(destinationList!=null && !("").equals(destinationList)) {
-            builder.append("Destination Floor(s) ").append(destinationList);
+        if(destination!=null && destination.length>0) {
+           StringBuilder destList = new StringBuilder("");
+           String separator="";
+           for(int i=0;i<destination.length;i++){
+               if(destination[i]){
+                   destList.append(separator);
+                   destList.append(i+1);
+                   separator=",";
+               }
+           }
+           builder.append("Destination List ").append(destList.toString());
         }
         builder.append("Rider ").append(riders);
         builder.append("Moving direction ").append(direction);

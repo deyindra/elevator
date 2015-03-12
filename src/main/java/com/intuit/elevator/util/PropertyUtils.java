@@ -88,10 +88,10 @@ public class PropertyUtils {
      * @param defaultValue A default value which will be returned in case of key not found
      * @return return the value/default value
      * This method internally called {@link #getStringPropertyValue(String, String)}
-     * @throws java.lang.NumberFormatException in case value is not long
+     * @throws java.lang.NumberFormatException in case value is not int
      */
-    public long getLongPropertyValue(String key, String defaultValue){
-        return Long.parseLong(getStringPropertyValue(key, defaultValue));
+    public int getIntPropertyValue(String key, String defaultValue){
+        return Integer.parseInt(getStringPropertyValue(key, defaultValue));
     }
 
 

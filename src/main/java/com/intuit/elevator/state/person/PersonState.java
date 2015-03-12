@@ -17,55 +17,97 @@ public class PersonState extends State{
     }
 
     // Person activity
-    private PersonActivity activity;
+    private volatile PersonActivity activity;
     /**
      * Elevator number only applicable in case of activity
      * is equal to {@link com.intuit.elevator.state.person.PersonState.PersonActivity#RIDING}
      */
-    private int elevatorNumber;
+    private volatile int elevatorNumber;
     // Current location of the person
-    private CurrentPersonLocation currentPersonLocation;
+    private volatile CurrentPersonLocation currentPersonLocation;
     // Destination location of the person
-    private DestinationPersonLocation destinationPersonLocation;
+    private volatile DestinationPersonLocation destinationPersonLocation;
 
 
 
-    public synchronized void setActivity(PersonActivity activity) {
-        assert (activity!=null);
-        this.activity = activity;
+    public  void setActivity(PersonActivity activity) {
+            writeLock.lock();
+            try {
+                assert (activity != null);
+                this.activity = activity;
+            }finally {
+                writeLock.unlock();
+            }
     }
 
-    public synchronized void setElevatorNumber(int elevatorNumber) {
-        assert (elevatorNumber>0);
-        this.elevatorNumber = elevatorNumber;
+    public  void setElevatorNumber(int elevatorNumber) {
+        writeLock.lock();
+        try {
+            assert (elevatorNumber > 0);
+            this.elevatorNumber = elevatorNumber;
+        }finally {
+            writeLock.unlock();
+        }
+
+
     }
 
-    public synchronized void setCurrentPersonLocation(CurrentPersonLocation currentPersonLocation) {
-        assert (currentPersonLocation!=null);
-        this.currentPersonLocation = currentPersonLocation;
+    public  void setCurrentPersonLocation(CurrentPersonLocation currentPersonLocation) {
+        writeLock.lock();
+        try {
+            assert (currentPersonLocation != null);
+            this.currentPersonLocation = currentPersonLocation;
+        }finally {
+            writeLock.unlock();
+        }
     }
 
-    public synchronized void setDestinationPersonLocation(DestinationPersonLocation destinationPersonLocation) {
-        assert (destinationPersonLocation!=null);
-        this.destinationPersonLocation = destinationPersonLocation;
+    public  void setDestinationPersonLocation(DestinationPersonLocation destinationPersonLocation) {
+        writeLock.lock();
+        try {
+            assert (destinationPersonLocation != null);
+            this.destinationPersonLocation = destinationPersonLocation;
+        }finally {
+            writeLock.unlock();
+        }
     }
 
 
 
     public PersonActivity getActivity() {
-        return activity;
+        readLock.lock();
+        try {
+            return activity;
+        }finally {
+            readLock.unlock();
+        }
     }
 
     public int getElevatorNumber() {
-        return elevatorNumber;
+        readLock.lock();
+        try {
+            return elevatorNumber;
+        }finally {
+            readLock.unlock();
+        }
     }
 
     public CurrentPersonLocation getCurrentPersonLocation() {
-        return currentPersonLocation;
+        readLock.lock();
+        try {
+            return currentPersonLocation;
+        }finally {
+            readLock.unlock();
+        }
     }
 
     public DestinationPersonLocation getDestinationPersonLocation() {
-        return destinationPersonLocation;
+        readLock.lock();
+        try {
+            return destinationPersonLocation;
+        }finally {
+            readLock.unlock();
+        }
     }
 
 
